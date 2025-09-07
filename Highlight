@@ -1,0 +1,184 @@
+--// Highlight ESP with Settings ScreenGui + Slide Animation
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+
+-- Function to apply highlight
+local function applyHighlight(player, color)
+    if player == LocalPlayer then return end
+
+    player.CharacterAdded:Connect(function(char)
+        local hrp = char:WaitForChild("HumanoidRootPart", 10)
+        if not hrp then return end
+
+        if char:FindFirstChild("ESP_Highlight") then
+            char.ESP_Highlight:Destroy()
+        end
+
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "ESP_Highlight"
+        highlight.Adornee = char
+        highlight.FillColor = color or Color3.fromRGB(0, 255, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.Parent = char
+    end)
+
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        if player.Character:FindFirstChild("ESP_Highlight") then
+            player.Character.ESP_Highlight:Destroy()
+        end
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "ESP_Highlight"
+        highlight.Adornee = player.Character
+        highlight.FillColor = color or Color3.fromRGB(0, 255, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.Parent = player.Character
+    end
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    applyHighlight(player)
+end
+Players.PlayerAdded:Connect(applyHighlight)
+
+--// ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HL_Settings"
+ScreenGui.Parent = game:GetService("CoreGui")
+
+-- HL Circle (always visible, draggable, open button)
+local circle = Instance.new("TextButton")
+circle.Text = "HL"
+circle.Size = UDim2.new(0, 50, 0, 50)
+circle.Position = UDim2.new(0.1, 0, 0.1, 0)
+circle.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+circle.TextColor3 = Color3.new(1, 1, 1)
+circle.Parent = ScreenGui
+Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+
+-- Dragging HL circle
+local dragging, dragStart, startPos
+circle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = circle.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+circle.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        game:GetService("UserInputService").InputChanged:Connect(function(moveInput)
+            if dragging and moveInput.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = moveInput.Position - dragStart
+                circle.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+    end
+end)
+
+-- Settings Frame (starts hidden off-screen)
+local settingsFrame = Instance.new("Frame")
+settingsFrame.Size = UDim2.new(0, 220, 0, 240)
+settingsFrame.Position = UDim2.new(0.3, 0, 1.2, 0) -- off screen bottom
+settingsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+settingsFrame.Parent = ScreenGui
+Instance.new("UICorner", settingsFrame)
+
+-- Slide open
+local function openSettings()
+    settingsFrame.Visible = true
+    TweenService:Create(settingsFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0.3, 0, 0.3, 0)
+    }):Play()
+end
+
+-- Slide close
+local function closeSettings()
+    local tween = TweenService:Create(settingsFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Position = UDim2.new(0.3, 0, 1.2, 0)
+    })
+    tween:Play()
+    tween.Completed:Connect(function()
+        settingsFrame.Visible = false
+    end)
+end
+
+-- Open when HL clicked
+circle.MouseButton1Click:Connect(openSettings)
+
+-- Close Button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Text = "X"
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Parent = settingsFrame
+Instance.new("UICorner", closeBtn)
+
+closeBtn.MouseButton1Click:Connect(closeSettings)
+
+-- RGB Inputs
+local sliders = {}
+local labels = {"R","G","B"}
+for i, name in ipairs(labels) do
+    local box = Instance.new("TextBox")
+    box.PlaceholderText = name.." (0-255)"
+    box.Text = ""
+    box.Size = UDim2.new(0, 180, 0, 25)
+    box.Position = UDim2.new(0, 20, 0, 50 + (i-1)*35)
+    box.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    box.TextColor3 = Color3.new(1,1,1)
+    box.Parent = settingsFrame
+    sliders[name] = box
+end
+
+-- Apply Button
+local applyBtn = Instance.new("TextButton")
+applyBtn.Text = "Apply RGB"
+applyBtn.Size = UDim2.new(0, 180, 0, 30)
+applyBtn.Position = UDim2.new(0, 20, 0, 160)
+applyBtn.BackgroundColor3 = Color3.fromRGB(70,70,200)
+applyBtn.TextColor3 = Color3.new(1,1,1)
+applyBtn.Parent = settingsFrame
+Instance.new("UICorner", applyBtn)
+
+applyBtn.MouseButton1Click:Connect(function()
+    local r = tonumber(sliders["R"].Text) or 0
+    local g = tonumber(sliders["G"].Text) or 0
+    local b = tonumber(sliders["B"].Text) or 0
+    local color = Color3.fromRGB(math.clamp(r,0,255), math.clamp(g,0,255), math.clamp(b,0,255))
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("ESP_Highlight") then
+            player.Character.ESP_Highlight.FillColor = color
+        end
+    end
+end)
+
+-- Disable Highlights
+local disableBtn = Instance.new("TextButton")
+disableBtn.Text = "Disable Highlights"
+disableBtn.Size = UDim2.new(0, 180, 0, 30)
+disableBtn.Position = UDim2.new(0, 20, 0, 200)
+disableBtn.BackgroundColor3 = Color3.fromRGB(200,70,70)
+disableBtn.TextColor3 = Color3.new(1,1,1)
+disableBtn.Parent = settingsFrame
+Instance.new("UICorner", disableBtn)
+
+disableBtn.MouseButton1Click:Connect(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("ESP_Highlight") then
+            player.Character.ESP_Highlight:Destroy()
+        end
+    end
+end)
